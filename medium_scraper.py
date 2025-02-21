@@ -1,35 +1,54 @@
 import os
-from playwright.sync_api import sync_playwright
+import re
+from playwright.sync_api import sync_playwright, TimeoutError
+
+
+def sanitize_filename(filename: str) -> str:
+    # Remove invalid characters and limit length
+    return re.sub(r'[\\/*?:"<>|]', "", filename)[:100]
 
 
 def scrape_medium_article(article_url: str) -> str:
     # Create screenshots directory if it doesn't exist
     os.makedirs("screenshots", exist_ok=True)
 
-    pw = sync_playwright().start()
-    browser = pw.chromium.launch(headless=True,slow_mo=4000)
-    page = browser.new_page()
-    page.goto("http://readmedium.com")
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True)
+            page = browser.new_page(viewport={"width": 1280, "height": 800})
+            page.goto("http://readmedium.com")
 
-    page.get_by_placeholder("Medium Article URL").fill(article_url)
-    page.get_by_role("button").get_by_text("GO ").click()
+            page.get_by_placeholder("Medium Article URL").fill(article_url)
+            page.get_by_role("button").get_by_text("GO ").click()
+            page.wait_for_load_state("networkidle")
 
-    # Get the article title and use it as the PDF name
-    article_title = page.title()
-    # Limit filename length
-    pdf_name = f"screenshots/{article_title[:50]}.pdf"
+            # Inject CSS to hide the navigation bar
+            page.add_style_tag(content="nav { display: none !important; }")
 
-    # Save the article as a PDF
-    page.pdf(path=pdf_name, format="A4")
+            # Get the article title and use it as the screenshot name
+            article_title = page.title()
+            screenshot_name = f"screenshots/{sanitize_filename(article_title)}.png"
 
-    print(f"PDF saved as {pdf_name}")
-    browser.close()
-    pw.stop()
+            article_tag = page.query_selector("article")
+            if article_tag:
+                article_tag.screenshot(path=screenshot_name)
+                print(f"Screenshot saved as {screenshot_name}")
+            else:
+                print("Article tag not found.")
+                screenshot_name = ""
 
-    return pdf_name
+            browser.close()
+            return screenshot_name
+
+    except TimeoutError:
+        print("Timeout while loading the page.")
+        return ""
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return ""
 
 
 if __name__ == "__main__":
     article_url = input("Enter the URL of the article you want to scrape: ")
-    pdf_path = scrape_medium_article(article_url)
-    print(f"PDF path: {pdf_path}")
+    screenshot_path = scrape_medium_article(article_url)
+    print(f"Screenshot path: {screenshot_path}")
