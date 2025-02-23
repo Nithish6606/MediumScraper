@@ -53,6 +53,21 @@ This project scrapes Medium articles and sends screenshots via a Telegram bot.
 
 2. Start a conversation with your Telegram bot and send a Medium article URL. The bot will scrape the article and send you a screenshot.
 
+## Docker installation
+>
+> Add .env file in root directory with
+
+```shell
+API_TOKEN=YOUR_TELEGRAM_TOKEN 
+```
+
+> Building image
+
+```shell
+docker build -t telegram-bot .
+docker run --env-file .env telegram-bot
+```
+
 ## License
 
 This project is licensed under the MIT License.
